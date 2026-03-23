@@ -1,0 +1,755 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="TF Timer">
+<title>Trading Timeframe Timer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@300;400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #060a0d;
+    --panel: #0b1018;
+    --border: #162030;
+    --green: #00e87a;
+    --amber: #ffb300;
+    --red: #ff3d5a;
+    --blue: #00c8ff;
+    --dim: #2a3a4a;
+    --text: #b8ccd8;
+    --text-dim: #3e5468;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Rajdhani', sans-serif;
+    min-height: 100vh; min-height: 100dvh;
+  }
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.07) 2px, rgba(0,0,0,0.07) 4px);
+    pointer-events: none; z-index: 999;
+  }
+  body::after {
+    content: '';
+    position: fixed; inset: 0;
+    background-image: linear-gradient(rgba(0,200,255,0.025) 1px, transparent 1px), linear-gradient(90deg, rgba(0,200,255,0.025) 1px, transparent 1px);
+    background-size: 48px 48px;
+    pointer-events: none; z-index: 0;
+  }
+  .app {
+    position: relative; z-index: 1;
+    max-width: 500px; margin: 0 auto;
+    padding: 14px;
+    padding-top: max(14px, env(safe-area-inset-top));
+    padding-bottom: max(14px, env(safe-area-inset-bottom));
+  }
+
+  /* HEADER */
+  .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+  .logo { font-family: 'Share Tech Mono', monospace; font-size: 10px; letter-spacing: 4px; color: var(--text-dim); }
+  .mkt-status { display: flex; align-items: center; gap: 7px; font-family: 'Share Tech Mono', monospace; font-size: 10px; letter-spacing: 2px; }
+  .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--dim); transition: background 0.5s, box-shadow 0.5s; }
+  .dot.open { background: var(--green); box-shadow: 0 0 10px rgba(0,232,122,0.6); animation: blink 2s infinite; }
+  .dot.pre  { background: var(--amber); box-shadow: 0 0 10px rgba(255,179,0,0.6);  animation: blink 2s infinite; }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+  /* CLOCK */
+  .clock-panel {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 3px;
+    padding: 18px 20px 16px; margin-bottom: 11px; position: relative; overflow: hidden; text-align: center;
+  }
+  .clock-panel::before {
+    content: ''; position: absolute; top: 0; left: 20%; right: 20%; height: 1px;
+    background: linear-gradient(90deg, transparent, var(--blue), transparent); opacity: 0.6;
+  }
+  .tz-time-main {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: clamp(44px, 13vw, 64px);
+    color: var(--blue); text-shadow: 0 0 30px rgba(0,200,255,0.35);
+    letter-spacing: 3px; line-height: 1; display: block; margin-bottom: 4px;
+    transition: color 0.3s, text-shadow 0.3s;
+  }
+  .tz-time-main.a15 { color: var(--amber); text-shadow: 0 0 30px rgba(255,179,0,0.4); }
+  .tz-time-main.a1h { color: var(--green); text-shadow: 0 0 30px rgba(0,232,122,0.4); }
+  .tz-time-main.a4h { color: var(--red);   text-shadow: 0 0 30px rgba(255,61,90,0.5); }
+  .date-line { font-family: 'Share Tech Mono', monospace; font-size: 10px; color: var(--text-dim); letter-spacing: 2px; margin-bottom: 13px; }
+  .tz-row { display: flex; justify-content: center; gap: 28px; margin-bottom: 13px; }
+  .tz-item { text-align: center; }
+  .tz-lbl  { font-family: 'Share Tech Mono', monospace; font-size: 8px; color: var(--text-dim); letter-spacing: 2px; display: block; margin-bottom: 2px; }
+  .tz-val  { font-family: 'Share Tech Mono', monospace; font-size: 12px; color: var(--text-dim); }
+  .sess-track { background: rgba(255,255,255,0.03); border: 1px solid var(--border); height: 5px; border-radius: 2px; overflow: hidden; margin-bottom: 5px; }
+  .sess-fill  { height: 100%; background: linear-gradient(90deg, var(--blue) 0%, var(--green) 100%); border-radius: 2px; transition: width 1s linear; box-shadow: 0 0 8px rgba(0,200,255,0.4); }
+  .sess-labels { display: flex; justify-content: space-between; font-family: 'Share Tech Mono', monospace; font-size: 9px; color: var(--text-dim); letter-spacing: 0.5px; }
+
+  /* TF CARDS */
+  .tf-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 9px; margin-bottom: 11px; }
+  .tf-card {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 3px;
+    padding: 13px 8px 11px; text-align: center; position: relative; overflow: hidden;
+    transition: border-color 0.3s, box-shadow 0.3s;
+  }
+  .tf-bar { position: absolute; bottom: 0; left: 0; height: 2px; transition: width 1s linear; border-radius: 0 1px 0 0; }
+  .c15 { --accent: var(--amber); }
+  .c1h { --accent: var(--green); }
+  .c4h { --accent: var(--red); }
+  .tf-card .tf-bar { background: var(--accent); opacity: 0.5; }
+  .tf-card.lit { border-color: var(--accent); box-shadow: 0 0 18px rgba(255,255,255,0.06); }
+  .tf-name { font-family: 'Share Tech Mono', monospace; font-size: 9px; letter-spacing: 3px; color: var(--text-dim); margin-bottom: 7px; }
+  .tf-cd {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: clamp(18px, 5.5vw, 25px);
+    color: var(--accent);
+    text-shadow: 0 0 12px color-mix(in srgb, var(--accent) 50%, transparent);
+    line-height: 1; margin-bottom: 5px; letter-spacing: 1px;
+  }
+  .tf-nxt { font-size: 10px; color: var(--text-dim); letter-spacing: 1px; font-family: 'Share Tech Mono', monospace; }
+  @keyframes warnFlash { 0%,100%{opacity:1} 40%{opacity:0.3} }
+  .tf-card.warning { animation: warnFlash 0.45s ease 4; }
+
+  /* LOG */
+  .log-wrap {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 3px;
+    padding: 11px 12px; margin-bottom: 11px; max-height: 135px; overflow-y: auto;
+  }
+  .log-wrap::-webkit-scrollbar { width: 3px; }
+  .log-wrap::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+  .section-title { font-family: 'Share Tech Mono', monospace; font-size: 9px; letter-spacing: 3px; color: var(--text-dim); margin-bottom: 8px; }
+  .log-entry { display: flex; align-items: center; gap: 8px; padding: 4px 0; border-bottom: 1px solid rgba(255,255,255,0.025); animation: fadeSlide 0.3s ease; }
+  @keyframes fadeSlide { from{opacity:0;transform:translateX(-6px)} to{opacity:1;transform:translateX(0)} }
+  .log-ts { font-family: 'Share Tech Mono', monospace; font-size: 10px; color: var(--text-dim); min-width: 55px; }
+  .log-txt { font-size: 12px; font-weight: 600; letter-spacing: 0.5px; flex: 1; }
+  .log-entry.e15  .log-txt { color: var(--amber); }
+  .log-entry.e1h  .log-txt { color: var(--green); }
+  .log-entry.e4h  .log-txt { color: var(--red); }
+  .log-entry.ewrn .log-txt { color: var(--text-dim); font-weight: 400; font-size: 11px; }
+  .log-badge { font-family: 'Share Tech Mono', monospace; font-size: 8px; padding: 1px 5px; border-radius: 2px; letter-spacing: 1px; }
+  .log-entry.e15  .log-badge { background: rgba(255,179,0,0.15);  color: var(--amber); border: 1px solid rgba(255,179,0,0.3); }
+  .log-entry.e1h  .log-badge { background: rgba(0,232,122,0.12);  color: var(--green); border: 1px solid rgba(0,232,122,0.25); }
+  .log-entry.e4h  .log-badge { background: rgba(255,61,90,0.12);  color: var(--red);   border: 1px solid rgba(255,61,90,0.25); }
+  .log-entry.ewrn .log-badge { background: rgba(255,255,255,0.05); color: var(--text-dim); border: 1px solid var(--border); }
+
+  /* UPCOMING */
+  .upcoming-wrap { background: var(--panel); border: 1px solid var(--border); border-radius: 3px; padding: 11px 12px; margin-bottom: 11px; }
+  .up-item { display: flex; align-items: center; gap: 9px; padding: 4px 0; border-bottom: 1px solid rgba(255,255,255,0.025); font-size: 12px; }
+  .up-item:last-child { border-bottom: none; }
+  .up-badge { font-family: 'Share Tech Mono', monospace; font-size: 9px; padding: 1px 6px; border-radius: 2px; letter-spacing: 1px; min-width: 30px; text-align: center; }
+  .up-badge.b15 { background: rgba(255,179,0,0.15);  color: var(--amber); border: 1px solid rgba(255,179,0,0.3); }
+  .up-badge.b1h { background: rgba(0,232,122,0.12);  color: var(--green); border: 1px solid rgba(0,232,122,0.25); }
+  .up-badge.b4h { background: rgba(255,61,90,0.12);  color: var(--red);   border: 1px solid rgba(255,61,90,0.25); }
+  .up-time { font-family: 'Share Tech Mono', monospace; color: var(--text); font-size: 12px; min-width: 80px; }
+  .up-desc { flex: 1; color: var(--text-dim); font-size: 11px; letter-spacing: 0.5px; }
+  .up-in   { font-family: 'Share Tech Mono', monospace; font-size: 11px; color: var(--text-dim); }
+
+  /* CONTROLS */
+  .ctrl-row { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; margin-bottom: 11px; }
+  .btn {
+    background: transparent; border: 1px solid var(--border); color: var(--text-dim);
+    padding: 9px 10px; border-radius: 3px;
+    font-family: 'Rajdhani', sans-serif; font-size: 11px; font-weight: 700; letter-spacing: 2px;
+    cursor: pointer; transition: all 0.2s; text-transform: uppercase;
+    display: flex; align-items: center; justify-content: center; gap: 5px;
+  }
+  .btn:active { transform: scale(0.97); }
+  .btn.on  { border-color: var(--green); color: var(--green); box-shadow: 0 0 12px rgba(0,232,122,0.15); }
+  .btn.off { border-color: var(--red);   color: var(--red); }
+
+  /* VOICE ROW */
+  .voice-row {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 3px;
+    padding: 10px 12px; display: flex; align-items: center; gap: 10px; margin-bottom: 11px;
+  }
+  .v-label { font-family: 'Share Tech Mono', monospace; font-size: 9px; color: var(--text-dim); letter-spacing: 2px; white-space: nowrap; }
+  select {
+    flex: 1; background: rgba(255,255,255,0.03); border: 1px solid var(--border);
+    color: var(--text); padding: 5px 8px; border-radius: 3px;
+    font-family: 'Rajdhani', sans-serif; font-size: 12px; font-weight: 600; letter-spacing: 1px;
+    outline: none; cursor: pointer;
+  }
+  select option { background: #0b1018; }
+  .test-btn { font-size: 10px; padding: 5px 10px; letter-spacing: 1.5px; }
+
+  /* FLASH */
+  .flash { position: fixed; inset: 0; pointer-events: none; z-index: 900; opacity: 0; transition: opacity 0.08s; }
+
+  /* 4H SCHEDULE PANEL */
+  .schedule-wrap { background: var(--panel); border: 1px solid var(--border); border-radius: 3px; padding: 11px 12px; margin-bottom: 11px; }
+  .sch-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 5px; }
+  .sch-item { text-align: center; padding: 6px 3px; border: 1px solid var(--border); border-radius: 2px; transition: all 0.3s; }
+  .sch-item.active { border-color: var(--red); background: rgba(255,61,90,0.08); }
+  .sch-time { font-family: 'Share Tech Mono', monospace; font-size: 9px; color: var(--text-dim); display: block; }
+  .sch-item.active .sch-time { color: var(--red); }
+
+  /* 1H SCHEDULE PANEL */
+  .sch1h-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 5px; }
+  .sch1h-item { text-align: center; padding: 5px 2px; border: 1px solid var(--border); border-radius: 2px; transition: all 0.3s; }
+  .sch1h-item.past    { opacity: 0.3; }
+  .sch1h-item.current { border-color: var(--green); background: rgba(0,232,122,0.08); }
+  .sch1h-item.next    { border-color: rgba(0,232,122,0.35); background: rgba(0,232,122,0.04); }
+  .sch1h-time { font-family: 'Share Tech Mono', monospace; font-size: 8px; color: var(--text-dim); display: block; line-height: 1.3; }
+  .sch1h-item.current .sch1h-time { color: var(--green); }
+  .sch1h-item.next    .sch1h-time { color: rgba(0,232,122,0.7); }
+
+  /* HINT */
+  .hint {
+    background: rgba(0,200,255,0.04); border: 1px solid rgba(0,200,255,0.12); border-radius: 3px;
+    padding: 10px 13px; font-size: 11px; color: var(--text-dim); line-height: 1.65; text-align: center; letter-spacing: 0.3px;
+  }
+  .hint strong { color: var(--blue); }
+</style>
+</head>
+<body>
+
+<div class="flash" id="flash"></div>
+
+<div class="app">
+
+  <div class="header">
+    <div class="logo">SWING TIMER · TV-ALIGNED</div>
+    <div class="mkt-status">
+      <div class="dot" id="mktDot"></div>
+      <span id="mktTxt" style="color:var(--text-dim)">--</span>
+    </div>
+  </div>
+
+  <div class="clock-panel">
+    <span class="tz-time-main" id="pstClock">--:--:--</span>
+    <div class="date-line" id="dateLine">---</div>
+    <div class="tz-row">
+      <div class="tz-item"><span class="tz-lbl">NEW YORK</span><span class="tz-val" id="estClock">--:--</span></div>
+      <div class="tz-item"><span class="tz-lbl">LONDON</span><span class="tz-val" id="lonClock">--:--</span></div>
+      <div class="tz-item"><span class="tz-lbl">UTC</span><span class="tz-val" id="utcClock">--:--</span></div>
+    </div>
+    <div class="sess-track"><div class="sess-fill" id="sessBar" style="width:0%"></div></div>
+    <div class="sess-labels">
+      <span>6:30 AM OPEN</span>
+      <span id="sessStatus">--</span>
+      <span>1:00 PM CLOSE</span>
+    </div>
+  </div>
+
+  <div class="tf-row">
+    <div class="tf-card c15" id="card15">
+      <div class="tf-name">15 MIN</div>
+      <div class="tf-cd" id="cd15">--:--</div>
+      <div class="tf-nxt" id="nxt15">→ --:--</div>
+      <div class="tf-bar" id="bar15" style="width:0%"></div>
+    </div>
+    <div class="tf-card c1h" id="card1h">
+      <div class="tf-name">1 HOUR</div>
+      <div class="tf-cd" id="cd1h">--:--</div>
+      <div class="tf-nxt" id="nxt1h">→ --:--</div>
+      <div class="tf-bar" id="bar1h" style="width:0%"></div>
+    </div>
+    <div class="tf-card c4h" id="card4h">
+      <div class="tf-name">4 HOUR</div>
+      <div class="tf-cd" id="cd4h">--:--</div>
+      <div class="tf-nxt" id="nxt4h">→ --:--</div>
+      <div class="tf-bar" id="bar4h" style="width:0%"></div>
+    </div>
+  </div>
+
+  <!-- 4H Schedule -->
+  <div class="schedule-wrap">
+    <div class="section-title">4H CANDLE CLOSES · PST (TV-ALIGNED)</div>
+    <div class="sch-grid" id="schGrid"></div>
+  </div>
+
+  <!-- 1H Schedule -->
+  <div class="schedule-wrap">
+    <div class="section-title">1H CANDLE CLOSES · PST — SWING POINTS</div>
+    <div class="sch1h-grid" id="sch1hGrid"></div>
+  </div>
+
+  <div class="voice-row">
+    <span class="v-label">VOICE</span>
+    <select id="voiceSel"><option value="">Loading voices…</option></select>
+    <button class="btn test-btn" id="testBtn">TEST</button>
+  </div>
+
+  <div class="ctrl-row">
+    <button class="btn on" id="soundBtn">🔊 SOUND ON</button>
+    <button class="btn on" id="warn5Btn">⚠️ 5-MIN WARN ON</button>
+  </div>
+
+  <div class="log-wrap">
+    <div class="section-title">ALERT LOG</div>
+    <div id="logList"></div>
+  </div>
+
+  <div class="upcoming-wrap">
+    <div class="section-title">NEXT CANDLE CLOSES (PST)</div>
+    <div id="upList"></div>
+  </div>
+
+  <div class="hint">
+    <strong>📱 iPhone:</strong> Open in Safari → Share → "Add to Home Screen". Set Auto-Lock to Never while trading (Settings → Display & Brightness). Keep Safari tab active for voice alerts in background.
+  </div>
+
+</div>
+
+<script>
+// ════════════════════════════════════════════════
+//  TradingView 4H closes in PST (UTC-8 fixed)
+//  UTC closes: 00,04,08,12,16,20
+//  → PST:      16,20,00,04,08,12
+//  → in mins:  960,1200,0,240,480,720
+//  Sorted:     0(12am), 240(4am), 480(8am), 660(11am)... 
+//  Wait: UTC 00 = PST 16:00, UTC 04 = PST 20:00, UTC 08 = PST 00:00,
+//        UTC 12 = PST 04:00, UTC 16 = PST 08:00, UTC 20 = PST 12:00
+//  PST sorted: 0:00(0), 3:00(180)... 
+//  Actually: PST = UTC - 8
+//  UTC 00:00 → PST 16:00 (prev day), so same calendar day:
+//  UTC 08:00 = PST 00:00 (midnight)
+//  UTC 12:00 = PST 04:00
+//  UTC 16:00 = PST 08:00
+//  UTC 20:00 = PST 12:00
+//  UTC 00:00 = PST 16:00
+//  UTC 04:00 = PST 20:00 (8pm)
+//
+//  User confirmed: 3am, 7am, 11am PST
+//  3am PST = 11:00 UTC ✓ (UTC 12 is actually 4am PST... let me recalc)
+//  PST = UTC - 8, so UTC = PST + 8
+//  3am PST → UTC 11:00  ← NOT on 4H boundary (UTC 4H = 0,4,8,12,16,20)
+//  7am PST → UTC 15:00  ← NOT on 4H boundary
+//  11am PST→ UTC 19:00  ← NOT on 4H boundary
+//
+//  Hmm. Let's check what UTC times give 3,7,11 PST:
+//  If PST+8 = UTC: 3+8=11, 7+8=15, 11+8=19 — not UTC 4H
+//
+//  BUT: TradingView uses "New York time" alignment for 4H bars, not UTC!
+//  NYSE opens 9:30 ET. TV 4H aligns to ET midnight.
+//  ET = UTC-5 (EST). So TV 4H closes UTC: 05,09,13,17,21,01
+//  → PST (UTC-8): 21(prev),1,5,9,13,17  = 9pm,1am,5am,9am,1pm,5pm
+//  Still doesn't match 3,7,11.
+//
+//  User says 3am, 7am, 11am. Diff = 4h. Starting from 3am:
+//  3am, 7am, 11am, 3pm, 7pm, 11pm PST
+//  These are offset 3 hours from midnight. 
+//  This is consistent with TV using Chicago/CT offset for alignment:
+//  CT = UTC-6, 4H closes at CT 00,04,08... → PST = CT-2:
+//  CT 00 = PST 22(prev), CT 02 = PST 00, CT 06=PST 04... nope
+//
+//  Simplest: just trust the user. 4H closes at 3,7,11am/pm PST.
+//  = minutes: 180, 420, 660, 900, 1140, 1380
+// ════════════════════════════════════════════════
+
+const FOUR_H = [
+  { m: 3*60,        label: '3:00 AM' },
+  { m: 7*60,        label: '7:00 AM' },
+  { m: 11*60,       label: '11:00 AM' },
+  { m: 15*60,       label: '3:00 PM' },
+  { m: 19*60,       label: '7:00 PM' },
+  { m: 23*60,       label: '11:00 PM' },
+];
+const FOUR_H_MINS = FOUR_H.map(x => x.m);
+
+const NY_OPEN  = 6*60 + 30;
+const NY_CLOSE = 13*60;
+
+let soundOn = true;
+let warn5On = true;
+let voices  = [];
+let chosenVoice = null;
+const fired = new Set();
+
+// ─── Voices ───────────────────────────────────────────
+function loadVoices() {
+  voices = window.speechSynthesis.getVoices();
+  if (!voices.length) return;
+  const sel = document.getElementById('voiceSel');
+  sel.innerHTML = '';
+  voices.forEach((v, i) => {
+    const opt = document.createElement('option');
+    opt.value = i;
+    opt.textContent = `${v.name} (${v.lang})`;
+    if (!chosenVoice && (v.name === 'Samantha' || v.lang.startsWith('en'))) {
+      opt.selected = true; chosenVoice = v;
+    }
+    sel.appendChild(opt);
+  });
+}
+window.speechSynthesis.onvoiceschanged = loadVoices;
+setTimeout(loadVoices, 500);
+
+document.getElementById('voiceSel').addEventListener('change', function() {
+  chosenVoice = voices[parseInt(this.value)];
+});
+
+function speak(msg, rate=1.0, pitch=1.0) {
+  if (!soundOn) return;
+  window.speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance(msg);
+  if (chosenVoice) u.voice = chosenVoice;
+  u.rate = rate; u.pitch = pitch; u.volume = 1;
+  window.speechSynthesis.speak(u);
+}
+
+// ─── Time helpers ────────────────────────────────────
+function getPST() {
+  // Auto-detects PST (UTC-8) vs PDT (UTC-7) — correct for daylight saving time
+  const now = new Date();
+  const laStr = now.toLocaleString('en-US', { timeZone: 'America/Los_Angeles' });
+  return new Date(laStr);
+}
+
+function getZone(tz) {
+  // Named timezone — auto-handles DST for every zone
+  return new Date().toLocaleTimeString('en-US', { timeZone: tz, hour: 'numeric', minute: '2-digit', hour12: true });
+}
+
+function fmtMins(mins) {
+  const h  = Math.floor((mins % (24*60)) / 60);
+  const m  = mins % 60;
+  const ap = h >= 12 ? 'PM' : 'AM';
+  return `${((h%12)||12)}:${String(m).padStart(2,'0')} ${ap}`;
+}
+
+function fmtCd(secs) {
+  secs = Math.max(0, secs);
+  const h = Math.floor(secs / 3600);
+  const m = Math.floor((secs % 3600) / 60);
+  const s = secs % 60;
+  if (h > 0) return `${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+  return `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+}
+
+function secUntil15(pstMins, s) {
+  const past = (pstMins % 15) * 60 + s;
+  return past === 0 ? 0 : 15*60 - past;
+}
+
+function secUntil1H(pstMins, s) {
+  const past = (pstMins % 60) * 60 + s;
+  return past === 0 ? 0 : 3600 - past;
+}
+
+function secUntil4H(pstMins, s) {
+  let minD = Infinity;
+  for (const t of FOUR_H_MINS) {
+    let d = t - pstMins;
+    if (d < 0) d += 24*60;
+    if (d < minD) minD = d;
+  }
+  if (minD === 0) return 0;
+  return minD * 60 - s;
+}
+
+function nextMultiple(pstMins, period) {
+  return ((Math.floor(pstMins / period) + 1) * period) % (24*60);
+}
+
+function next4HMins(pstMins) {
+  let minD = Infinity, best = 0;
+  for (const t of FOUR_H_MINS) {
+    let d = t - pstMins; if (d <= 0) d += 24*60;
+    if (d < minD) { minD = d; best = t; }
+  }
+  return best;
+}
+
+// ─── Build 4H schedule grid ─────────────────────────
+function buildSchedule(pstMins) {
+  const grid = document.getElementById('schGrid');
+  grid.innerHTML = '';
+  FOUR_H.forEach(item => {
+    const div = document.createElement('div');
+    const isNext = item.m === next4HMins(pstMins);
+    div.className = 'sch-item' + (isNext ? ' active' : '');
+    div.innerHTML = `<span class="sch-time">${item.label}</span>`;
+    grid.appendChild(div);
+  });
+}
+
+// ─── Build 1H schedule grid ──────────────────────────
+// Show all 24 hours; highlight past (dimmed), current window, and next close
+function buildSchedule1H(pstMins) {
+  const grid = document.getElementById('sch1hGrid');
+  grid.innerHTML = '';
+  const currentHour = Math.floor(pstMins / 60); // hour currently in progress
+  const nextClose   = currentHour + 1;           // next hourly close (hour number)
+
+  for (let hr = 0; hr < 24; hr++) {
+    const closeHr = hr; // this cell represents the close OF hour hr (i.e. at hr:00)
+    const ap   = closeHr >= 12 ? 'P' : 'A';
+    const disp = `${((closeHr % 12) || 12)}${ap}`;
+
+    let cls = '';
+    if (closeHr < currentHour)      cls = 'past';
+    else if (closeHr === nextClose)  cls = 'next';
+    // "current" = the close that just happened (top of currentHour)
+    else if (closeHr === currentHour && pstMins % 60 === 0) cls = 'current';
+
+    const div = document.createElement('div');
+    div.className = `sch1h-item${cls ? ' ' + cls : ''}`;
+    div.innerHTML = `<span class="sch1h-time">${disp}</span>`;
+    grid.appendChild(div);
+  }
+}
+
+// ─── Upcoming list ───────────────────────────────────
+function buildUpcoming(pstMins, s) {
+  const events = [];
+  const pstSec = pstMins * 60 + s;
+
+  // 15M closes (next 5, excluding exact hour/4H to avoid duplicates)
+  for (let i = 1; i <= 5; i++) {
+    const m = ((Math.floor(pstMins / 15) + i) * 15) % (24*60);
+    const diff = ((m * 60) - pstSec + 86400) % 86400;
+    const is1H = m % 60 === 0;
+    const is4H = FOUR_H_MINS.includes(m);
+    if (!is1H && !is4H) events.push({ m, diff, type:'15', label:'15M' });
+  }
+  // 1H closes (next 3)
+  for (let i = 1; i <= 3; i++) {
+    const m = ((Math.floor(pstMins / 60) + i) * 60) % (24*60);
+    const diff = ((m * 60) - pstSec + 86400) % 86400;
+    const is4H = FOUR_H_MINS.includes(m);
+    events.push({ m, diff, type: is4H ? '4h':'1h', label: is4H ? '4H+1H':'1H' });
+  }
+  // 4H closes (next 2, not already added as 1H)
+  for (const t of FOUR_H_MINS) {
+    const diff = ((t * 60) - pstSec + 86400) % 86400;
+    if (!events.find(e => e.m === t)) {
+      events.push({ m: t, diff, type:'4h', label:'4H' });
+    }
+  }
+
+  events.sort((a,b) => a.diff - b.diff);
+
+  const list = document.getElementById('upList');
+  list.innerHTML = '';
+  events.slice(0, 6).forEach(ev => {
+    const bc = ev.type==='4h'?'b4h': ev.type==='1h'?'b1h':'b15';
+    const minIn = Math.floor(ev.diff / 60);
+    const secIn = ev.diff % 60;
+    const inStr = minIn >= 60
+      ? `${Math.floor(minIn/60)}h ${minIn%60}m`
+      : `${minIn}m ${secIn}s`;
+    const desc = ev.type==='4h'?'4H Candle Close': ev.type==='1h'?'Hourly Close':'15M Close';
+    const div = document.createElement('div');
+    div.className = 'up-item';
+    div.innerHTML = `
+      <span class="up-badge ${bc}">${ev.label}</span>
+      <span class="up-time">${fmtMins(ev.m)}</span>
+      <span class="up-desc">${desc}</span>
+      <span class="up-in">in ${inStr}</span>
+    `;
+    list.appendChild(div);
+  });
+}
+
+// ─── Log ─────────────────────────────────────────────
+function addLog(ts, msg, cls) {
+  const list = document.getElementById('logList');
+  const div  = document.createElement('div');
+  div.className = `log-entry ${cls}`;
+  const badge = { e15:'15M', e1h:'1H', e4h:'4H', ewrn:'WARN' }[cls] || '';
+  div.innerHTML = `<span class="log-ts">${ts}</span><span class="log-badge">${badge}</span><span class="log-txt">${msg}</span>`;
+  list.prepend(div);
+  while (list.children.length > 30) list.removeChild(list.lastChild);
+}
+
+// ─── Flash ───────────────────────────────────────────
+function doFlash(color) {
+  const el = document.getElementById('flash');
+  el.style.background = `radial-gradient(ellipse at center, ${color}, transparent 70%)`;
+  el.style.opacity = '1';
+  setTimeout(() => el.style.opacity = '0', 450);
+}
+
+function flashCard(id, cls) {
+  const el = document.getElementById(id);
+  el.classList.add(cls);
+  setTimeout(() => el.classList.remove(cls), 2200);
+}
+
+// ─── Main tick ───────────────────────────────────────
+let lastUpcomingUpdate = -1;
+
+function tick() {
+  const pst  = getPST();
+  const h = pst.getHours(), m = pst.getMinutes(), s = pst.getSeconds();
+  const pstMins = h * 60 + m;
+
+  // ── Clock ──
+  const ap = h >= 12 ? 'PM' : 'AM';
+  const hh = ((h%12)||12);
+  document.getElementById('pstClock').textContent =
+    `${String(hh).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')} ${ap}`;
+
+  const DAYS   = ['SUN','MON','TUE','WED','THU','FRI','SAT'];
+  const MONTHS = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+  document.getElementById('dateLine').textContent =
+    `${DAYS[pst.getDay()]} · ${MONTHS[pst.getMonth()]} ${pst.getDate()} ${pst.getFullYear()} · PT (PDT/PST)`;
+
+  // Secondary clocks
+  document.getElementById('estClock').textContent = getZone('America/New_York');
+  document.getElementById('lonClock').textContent = getZone('Europe/London');
+  document.getElementById('utcClock').textContent = getZone('UTC');
+
+  // ── Market status ──
+  const dot = document.getElementById('mktDot');
+  const txt = document.getElementById('mktTxt');
+  if (pstMins >= 4*60 && pstMins < NY_OPEN) {
+    dot.className = 'dot pre';  txt.textContent = 'PRE-MKT'; txt.style.color = 'var(--amber)';
+  } else if (pstMins >= NY_OPEN && pstMins < NY_CLOSE) {
+    dot.className = 'dot open'; txt.textContent = 'MKT OPEN'; txt.style.color = 'var(--green)';
+  } else {
+    dot.className = 'dot';      txt.textContent = 'CLOSED';   txt.style.color = 'var(--text-dim)';
+  }
+
+  // ── Session bar ──
+  const pct = Math.max(0, Math.min(100, ((pstMins - NY_OPEN) / (NY_CLOSE - NY_OPEN)) * 100));
+  document.getElementById('sessBar').style.width = pct + '%';
+  document.getElementById('sessStatus').textContent =
+    pstMins < NY_OPEN ? 'PRE-MARKET' : pstMins < NY_CLOSE ? 'SESSION LIVE' : 'CLOSED';
+
+  // ── Countdowns ──
+  const s15  = secUntil15(pstMins, s);
+  const s1h  = secUntil1H(pstMins, s);
+  const s4h  = secUntil4H(pstMins, s);
+
+  document.getElementById('cd15').textContent  = fmtCd(s15);
+  document.getElementById('cd1h').textContent  = fmtCd(s1h);
+  document.getElementById('cd4h').textContent  = fmtCd(s4h);
+
+  document.getElementById('nxt15').textContent = '→ ' + fmtMins(nextMultiple(pstMins, 15));
+  document.getElementById('nxt1h').textContent = '→ ' + fmtMins(nextMultiple(pstMins, 60));
+  document.getElementById('nxt4h').textContent = '→ ' + fmtMins(next4HMins(pstMins));
+
+  document.getElementById('bar15').style.width = (100 - (s15/(15*60))*100).toFixed(1) + '%';
+  document.getElementById('bar1h').style.width = (100 - (s1h/3600)*100).toFixed(1) + '%';
+  document.getElementById('bar4h').style.width = Math.min(100, 100 - (s4h/(4*3600))*100).toFixed(1) + '%';
+
+  // ── Clock color flash near close ──
+  const cl = document.getElementById('pstClock');
+  cl.classList.remove('a15','a1h','a4h');
+  if (s4h <= 5 && s4h >= 0)       cl.classList.add('a4h');
+  else if (s1h <= 5 && s1h >= 0)  cl.classList.add('a1h');
+  else if (s15 <= 5 && s15 >= 0)  cl.classList.add('a15');
+
+  // ── ALERTS ──
+  const ts = `${String(hh).padStart(2,'0')}:${String(m).padStart(2,'0')} ${ap}`;
+
+  function once(key, fn) {
+    if (!fired.has(key)) {
+      fired.add(key);
+      fn();
+      if (fired.size > 300) { const a=[...fired]; a.slice(0,150).forEach(k=>fired.delete(k)); }
+    }
+  }
+
+  // ON THE CLOSE (s===0)
+  if (s === 0) {
+    const is4H = FOUR_H_MINS.includes(pstMins);
+    const is1H = pstMins % 60 === 0;
+    const is15 = pstMins % 15 === 0;
+
+    if (is4H) {
+      once(`4h-cls-${pstMins}`, () => {
+        speak(`4 hour candle close. ${ts}. Watch for a 4 hour swing point. New 4 hour candle open.`, 0.95, 1.05);
+        addLog(ts, '4H CLOSE + NEW OPEN — WATCH FOR SWING POINT', 'e4h');
+        doFlash('rgba(255,61,90,0.2)');
+        flashCard('card4h','lit');
+      });
+    } else if (is1H) {
+      once(`1h-cls-${pstMins}`, () => {
+        speak(`1 hour candle close. ${ts}. Watch for a 1 hour swing point. New 1 hour candle open.`, 1.0, 1.0);
+        addLog(ts, '1H CLOSE + NEW OPEN — WATCH FOR SWING POINT', 'e1h');
+        doFlash('rgba(0,232,122,0.12)');
+        flashCard('card1h','lit');
+      });
+    } else if (is15) {
+      once(`15-cls-${pstMins}`, () => {
+        speak(`15 minute candle close. New 15 minute candle open. ${ts}.`, 1.05, 1.0);
+        addLog(ts, '15M CLOSE + NEW OPEN', 'e15');
+        doFlash('rgba(255,179,0,0.1)');
+        flashCard('card15','lit');
+      });
+    }
+  }
+
+  // 5-MINUTE WARNINGS (fires at s===0 of the minute that is 5 before close)
+  if (warn5On && s === 0) {
+    const ahead = (pstMins + 5) % (24*60);
+    const is4Hahead = FOUR_H_MINS.includes(ahead);
+    const is1Hahead = ahead % 60 === 0;
+    const is15ahead = ahead % 15 === 0;
+    const closeStr  = fmtMins(ahead);
+
+    if (is4Hahead) {
+      once(`4h-wrn-${pstMins}`, () => {
+        speak(`Warning. 4 hour candle closes in 5 minutes at ${closeStr}. Prepare for a potential swing point.`, 0.95, 1.05);
+        addLog(ts, `5-MIN WARN → 4H close at ${closeStr}`, 'ewrn');
+        flashCard('card4h','warning');
+      });
+    } else if (is1Hahead) {
+      once(`1h-wrn-${pstMins}`, () => {
+        speak(`Warning. 1 hour candle closes in 5 minutes at ${closeStr}. Prepare for a potential 1 hour swing point.`, 1.0, 1.0);
+        addLog(ts, `5-MIN WARN → 1H close at ${closeStr}`, 'ewrn');
+        flashCard('card1h','warning');
+      });
+    } else if (is15ahead) {
+      once(`15-wrn-${pstMins}`, () => {
+        speak(`15 minute candle closes in 5 minutes.`, 1.05, 1.0);
+        addLog(ts, `5-MIN WARN → 15M close at ${closeStr}`, 'ewrn');
+        flashCard('card15','warning');
+      });
+    }
+  }
+
+  // Update upcoming & schedule every 5 seconds
+  if (m !== lastUpcomingUpdate || s % 5 === 0) {
+    buildUpcoming(pstMins, s);
+    buildSchedule(pstMins);
+    buildSchedule1H(pstMins);
+    lastUpcomingUpdate = m;
+  }
+}
+
+// ─── Controls ────────────────────────────────────────
+document.getElementById('soundBtn').addEventListener('click', function() {
+  soundOn = !soundOn;
+  this.textContent = soundOn ? '🔊 SOUND ON' : '🔇 SOUND OFF';
+  this.className   = 'btn ' + (soundOn ? 'on' : 'off');
+});
+
+document.getElementById('warn5Btn').addEventListener('click', function() {
+  warn5On = !warn5On;
+  this.textContent = warn5On ? '⚠️ 5-MIN WARN ON' : '⚠️ 5-MIN WARN OFF';
+  this.className   = 'btn ' + (warn5On ? 'on' : 'off');
+});
+
+document.getElementById('testBtn').addEventListener('click', () => {
+  const pst = getPST();
+  const h = pst.getHours(), m = pst.getMinutes();
+  const ap = h>=12?'PM':'AM';
+  const hh = ((h%12)||12);
+  const ts = `${String(hh).padStart(2,'0')}:${String(m).padStart(2,'0')} ${ap}`;
+  speak('Trading timeframe timer active. Voice alerts are working. Good trading today.', 1.0, 1.0);
+  addLog(ts, 'Voice test fired', 'ewrn');
+});
+
+// ─── Wake Lock ───────────────────────────────────────
+async function keepAwake() {
+  if ('wakeLock' in navigator) {
+    try { await navigator.wakeLock.request('screen'); } catch(e) {}
+  }
+}
+keepAwake();
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') keepAwake();
+});
+
+// ─── Start ───────────────────────────────────────────
+tick();
+setInterval(tick, 1000);
+</script>
+</body>
+</html>
